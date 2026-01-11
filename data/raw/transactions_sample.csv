@@ -1,6 +1,6 @@
 transaction_id,transaction_date,department_id,transaction_type,amount,description
 T001,2025-10-01,D001,EXPENSE,120.50,Stationery
-T002,2025-10-02,D002,EXPENSE,-25.00,Refund error
+T002,2025-10-02,D002,REFUND,-25.00,Refund
 T003,2025-10-03,D001,INCOME,500.00,Grant income
 T004,2025-10-03,D003,EXPENSE,75.25,Travel
 T005,INVALID_DATE,D002,EXPENSE,90.00,Catering
