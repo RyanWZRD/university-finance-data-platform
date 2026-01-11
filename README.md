@@ -39,6 +39,18 @@ The platform follows a standard ELT (Extract, Load, Transform) pattern:
 - `warehouse/` – Warehouse schemas and performance notes
 - `analytics_examples/` – Example analytical queries
 - `infra/` – Infrastructure and IAM documentation
+## Data Quality & Validation
+This project applies finance-aware data quality rules to ensure only auditable, reporting-safe data proceeds downstream.
+
+Validation logic:
+- Enforces required finance fields
+- Applies transaction-type sign rules
+- Separates CRITICAL failures from WARNING conditions
+- Produces an auditable validation report
+- Fails the pipeline on critical finance control breaches
+
+Detailed rules and rationale are documented here:  
+📄 `architecture/data_quality_rules.md`
 
 ## Current Status
 🚧 Project in active development.  
