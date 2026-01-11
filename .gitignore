@@ -1,3 +1,6 @@
 # Generated outputs
 data/staging/*.parquet
 data/staging/*.txt
+# Python bytecode
+__pycache__/
+*.pyc
