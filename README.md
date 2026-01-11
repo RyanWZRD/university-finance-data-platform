@@ -39,6 +39,14 @@ The platform follows a standard ELT (Extract, Load, Transform) pattern:
 - `warehouse/` – Warehouse schemas and performance notes
 - `analytics_examples/` – Example analytical queries
 - `infra/` – Infrastructure and IAM documentation
+
+## Run locally (DuckDB warehouse)
+
+### 1) Create staging outputs (ingestion)
+```powershell
+python -m ingestion.extract_csv_data
+python -m ingestion.validate_raw_data
+
 ## Data Quality & Validation
 This project applies finance-aware data quality rules to ensure only auditable, reporting-safe data proceeds downstream.
 
