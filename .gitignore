@@ -4,3 +4,5 @@ data/staging/*.txt
 # Python bytecode
 __pycache__/
 *.pyc
+# Local DuckDB database
+warehouse.duckdb
