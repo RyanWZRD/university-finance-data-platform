@@ -23,11 +23,14 @@ REQUIRED_COLS = [
 ]
 
 ALLOWED_TRANSACTION_TYPES = {"EXPENSE", "INCOME", "REFUND"}
-FAIL_ON_REJECTS = True
+
+# Threshold-based failure configuration
+MAX_REJECT_RATE = 0.50   # 5%
+MAX_REJECT_ROWS = 0      # 0 = disabled
 
 
 def main() -> None:
-    logger.info("Starting validation step (quarantine mode)")
+    logger.info("Starting validation step (quarantine + threshold mode)")
 
     if not IN_PATH.exists():
         raise FileNotFoundError(f"Missing input file: {IN_PATH}")
@@ -61,9 +64,8 @@ def main() -> None:
         add_reason(bad_date_mask, "invalid_transaction_date")
     df["transaction_date"] = parsed_dates
 
-    # 3) Parse amount (correct, no double-counting)
+    # 3) Parse amount (no double-counting)
     raw_amount = df["amount"]
-
     is_amount_missing = raw_amount.isna() | raw_amount.astype(str).str.strip().eq("")
     numeric_amount = pd.to_numeric(raw_amount, errors="coerce")
 
@@ -106,10 +108,10 @@ def main() -> None:
     rejected_n = len(rejected_df)
     reject_rate = rejected_n / total if total else 0.0
 
-    # Build report
+    # Write validation report
     with REPORT_PATH.open("w", encoding="utf-8") as f:
-        f.write("Validation Report (Quarantine Mode)\n")
-        f.write("=================================\n\n")
+        f.write("Validation Report (Quarantine + Threshold Mode)\n")
+        f.write("==============================================\n\n")
         f.write(f"Rows checked: {total}\n")
         f.write(f"Valid rows: {len(valid_df)}\n")
         f.write(f"Rejected rows: {rejected_n}\n")
@@ -133,11 +135,29 @@ def main() -> None:
     logger.info("Wrote rejected parquet to %s (rows=%d)", REJECTED_OUT_PATH, rejected_n)
     logger.info("Wrote validation report to %s", REPORT_PATH)
 
-    if FAIL_ON_REJECTS and rejected_n > 0:
-        logger.error("Validation FAILED: %d rejected row(s)", rejected_n)
+    # Threshold-based fail decision
+    fail_by_rate = reject_rate > MAX_REJECT_RATE
+    fail_by_rows = (MAX_REJECT_ROWS > 0) and (rejected_n > MAX_REJECT_ROWS)
+
+    if fail_by_rate or fail_by_rows:
+        logger.error(
+            "Validation FAILED: rejected=%d (%.2f%%) | thresholds: rate<=%.2f%% rows<=%s",
+            rejected_n,
+            reject_rate * 100,
+            MAX_REJECT_RATE * 100,
+            str(MAX_REJECT_ROWS) if MAX_REJECT_ROWS > 0 else "disabled",
+        )
         sys.exit(1)
 
-    logger.warning("Validation PASSED with rejected rows=%d", rejected_n)
+    if rejected_n > 0:
+        logger.warning(
+            "Validation PASSED with rejects: rejected=%d (%.2f%%) within threshold %.2f%%",
+            rejected_n,
+            reject_rate * 100,
+            MAX_REJECT_RATE * 100,
+        )
+    else:
+        logger.info("Validation PASSED with no rejected rows")
 
 
 if __name__ == "__main__":
