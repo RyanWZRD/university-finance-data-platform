@@ -1,74 +1,57 @@
 # University Finance Data Platform
 
 ## Overview
-This project demonstrates an end-to-end data engineering pipeline designed to support reliable, auditable financial reporting in a university context.
+This project demonstrates an end-to-end data engineering pipeline designed to support **reliable, auditable financial reporting** in a university context.
 
-The pipeline ingests raw financial data, applies structured transformations, and loads analytics-ready data into a warehouse for reporting and analysis.
+The platform ingests raw financial data, applies robust validation and data quality controls, and produces analytics-ready warehouse tables suitable for reporting, dashboards, and downstream analysis.
+
+The project is intentionally designed to reflect **real-world data engineering practices**, including data validation, quarantine handling, orchestration, and warehouse modelling.
+
+---
 
 ## Problem Statement
-University finance teams often rely on manual processes, spreadsheets, and disconnected systems to produce financial reports.  
-This can lead to:
+University finance teams often rely on manual processes, spreadsheets, and disconnected systems to produce financial reports. These approaches can lead to:
+
 - Inconsistent figures
 - Limited auditability
 - Slow reporting cycles
+- Weak data quality controls
 
-This project shows how a modern data engineering approach can improve accuracy, transparency, and scalability.
+This project shows how a modern data engineering pipeline can improve **accuracy, transparency, and scalability** in financial reporting.
+
+---
 
 ## High-Level Architecture
-The platform follows a standard ELT (Extract, Load, Transform) pattern:
+The platform follows a standard **ELT (Extract, Load, Transform)** pattern:
 
 1. Raw financial data is ingested from source systems
-2. Data is stored in a raw layer
-3. Transformations are applied using analytics engineering best practices
-4. Clean, structured tables are produced for reporting
+2. Data is stored in a raw and staging layer
+3. Finance-aware validation rules are applied
+4. Clean, structured warehouse tables are built
+5. Analytics queries operate only on validated data
 
-## Technology Stack (Planned)
-- SQL
-- Python
-- AWS (S3, Redshift, Athena)
-- dbt
-- Apache Airflow
-- Git & GitHub
+---
+
+## Technology Stack
+- **Python** – ingestion, validation, orchestration
+- **SQL** – warehouse transformations and analytics
+- **DuckDB** – local analytical warehouse (Parquet-native)
+- **Parquet** – columnar storage format
+- **Git & GitHub** – version control
+
+*(Cloud tooling such as AWS, dbt, and Airflow are planned extensions.)*
+
+---
 
 ## Project Structure
-- `architecture/` – Architecture diagrams and design notes
-- `data/` – Raw and staged datasets
-- `ingestion/` – Data extraction and validation scripts
-- `transformations/` – dbt models and tests
-- `orchestration/` – Airflow DAGs
-- `warehouse/` – Warehouse schemas and performance notes
-- `analytics_examples/` – Example analytical queries
-- `infra/` – Infrastructure and IAM documentation
-
-## Run locally (DuckDB warehouse)
-
-### 1) Create staging outputs (ingestion)
-```powershell
-python -m ingestion.extract_csv_data
-python -m ingestion.validate_raw_data
-
-## Data Quality & Validation
-This project applies finance-aware data quality rules to ensure only auditable, reporting-safe data proceeds downstream.
-
-Validation logic:
-- Enforces required finance fields
-- Applies transaction-type sign rules
-- Separates CRITICAL failures from WARNING conditions
-- Produces an auditable validation report
-- Fails the pipeline on critical finance control breaches
-
-Detailed rules and rationale are documented here:  
-📄 `architecture/data_quality_rules.md`
-
-## Current Status
-🚧 Project in active development.  
-Initial repository structure and documentation completed.
-
-## Future Improvements
-- Add automated data quality checks
-- Implement incremental loading
-- Extend to near–real-time ingestion
-- Add role-based access controls
-
-## Author
-Finance professional transitioning into data engineering, with a focus on building robust and auditable data platforms for financial reporting.
+```text
+architecture/        # Architecture notes and data quality rules
+data/
+  ├── raw/            # Raw source data
+  └── staging/        # Validated, quarantined, and warehouse-ready data
+ingestion/           # Extraction and validation logic
+transformations/     # Warehouse build SQL and scripts
+orchestration/       # Pipeline orchestration logic
+warehouse/           # Warehouse schema documentation
+analytics_examples/  # Example analytics queries
+infra/               # Infrastructure notes (future)
