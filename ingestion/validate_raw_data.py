@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 import sys
 import pandas as pd
@@ -9,7 +10,6 @@ from ingestion.logging_config import setup_logging
 logger = setup_logging("validate")
 
 IN_PATH = Path("data/staging/transactions_raw.parquet")
-
 VALID_OUT_PATH = Path("data/staging/transactions_valid.parquet")
 REJECTED_OUT_PATH = Path("data/staging/transactions_rejected.parquet")
 REPORT_PATH = Path("data/staging/validation_report.txt")
@@ -24,17 +24,30 @@ REQUIRED_COLS = [
 
 ALLOWED_TRANSACTION_TYPES = {"EXPENSE", "INCOME", "REFUND"}
 
-# Threshold-based failure configuration
 MAX_REJECT_RATE = 0.05   # 5%
-MAX_REJECT_ROWS = 0      # 0 = disabled
+MAX_REJECT_ROWS = 0      # disabled
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Validate finance data")
+    parser.add_argument(
+        "--mode",
+        choices=["strict", "lenient"],
+        default="strict",
+        help="Validation mode: strict fails on threshold breach, lenient logs warnings only",
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
+    args = parse_args()
+
     logger.info("Starting validation step (quarantine + threshold mode)")
 
     if not IN_PATH.exists():
         raise FileNotFoundError(f"Missing input file: {IN_PATH}")
 
+    # Load data FIRST
     df = pd.read_parquet(IN_PATH)
     logger.info("Loaded %d rows from %s", len(df), IN_PATH.resolve())
 
@@ -100,7 +113,6 @@ def main() -> None:
     valid_df = df.loc[~rejected_mask].copy()
 
     VALID_OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     valid_df.to_parquet(VALID_OUT_PATH, index=False)
     rejected_df.to_parquet(REJECTED_OUT_PATH, index=False)
 
@@ -140,21 +152,25 @@ def main() -> None:
     fail_by_rows = (MAX_REJECT_ROWS > 0) and (rejected_n > MAX_REJECT_ROWS)
 
     if fail_by_rate or fail_by_rows:
-        logger.error(
-            "Validation FAILED: rejected=%d (%.2f%%) | thresholds: rate<=%.2f%% rows<=%s",
-            rejected_n,
-            reject_rate * 100,
-            MAX_REJECT_RATE * 100,
-            str(MAX_REJECT_ROWS) if MAX_REJECT_ROWS > 0 else "disabled",
-        )
-        sys.exit(1)
+        if args.mode == "strict":
+            logger.error(
+                "Validation FAILED (strict mode): rejected=%d (%.2f%%)",
+                rejected_n,
+                reject_rate * 100,
+            )
+            sys.exit(1)
+        else:
+            logger.warning(
+                "Validation threshold breached (lenient mode): rejected=%d (%.2f%%)",
+                rejected_n,
+                reject_rate * 100,
+            )
 
     if rejected_n > 0:
         logger.warning(
-            "Validation PASSED with rejects: rejected=%d (%.2f%%) within threshold %.2f%%",
+            "Validation PASSED with rejects: rejected=%d (%.2f%%)",
             rejected_n,
             reject_rate * 100,
-            MAX_REJECT_RATE * 100,
         )
     else:
         logger.info("Validation PASSED with no rejected rows")
