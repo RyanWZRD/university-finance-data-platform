@@ -25,7 +25,7 @@ REQUIRED_COLS = [
 ALLOWED_TRANSACTION_TYPES = {"EXPENSE", "INCOME", "REFUND"}
 
 # Threshold-based failure configuration
-MAX_REJECT_RATE = 0.50   # 5%
+MAX_REJECT_RATE = 0.05   # 5%
 MAX_REJECT_ROWS = 0      # 0 = disabled
 
 
