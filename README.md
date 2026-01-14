@@ -1,3 +1,5 @@
+![CI](https://github.com/RyanWZRD/university-finance-data-platform/actions/workflows/ci.yml/badge.svg)
+
 # University Finance Data Platform
 
 ## Overview
