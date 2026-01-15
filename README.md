@@ -2,58 +2,43 @@
 
 # University Finance Data Platform
 
-## Overview
-This project demonstrates an end-to-end data engineering pipeline designed to support **reliable, auditable financial reporting** in a university context.
+A small, config-driven data pipeline that ingests transactions from CSV, quarantines bad rows, validates schema + business rules, produces analytics outputs, and writes per-run metrics as JSON.
 
-The platform ingests raw financial data, applies robust validation and data quality controls, and produces analytics-ready warehouse tables suitable for reporting, dashboards, and downstream analysis.
+## Project structure
 
-The project is intentionally designed to reflect **real-world data engineering practices**, including data validation, quarantine handling, orchestration, and warehouse modelling.
+- `data/raw/`  
+  Raw input data (e.g., `transactions_sample.csv`)
 
----
+- `data/processed/`  
+  Cleaned dataset + quarantined rows
+  - `transactions_clean.csv`
+  - `transactions_quarantine.csv`
 
-## Problem Statement
-University finance teams often rely on manual processes, spreadsheets, and disconnected systems to produce financial reports. These approaches can lead to:
+- `data/gold/`  
+  Analytics outputs
+  - `transactions_analytics.csv`
+  - `department_monthly_summary.csv`
 
-- Inconsistent figures
-- Limited auditability
-- Slow reporting cycles
-- Weak data quality controls
+- `metrics/` *(ignored by git)*  
+  Run metrics JSON files (e.g., `run_YYYYMMDD_HHMMSS.json`)
 
-This project shows how a modern data engineering pipeline can improve **accuracy, transparency, and scalability** in financial reporting.
+- `config/`  
+  YAML configuration (paths + pipeline options)
 
----
+- `src/`  
+  Pipeline source code
+  - `src/pipeline/run_pipeline.py` (main entrypoint)
+  - `src/ingestion/load_csv.py` (ingestion + quarantine + validation + processed outputs)
+  - `src/transforms/transform_transactions.py` (gold outputs)
+  - `src/metrics/summarize_runs.py` (summarise last N run metrics)
 
-## High-Level Architecture
-The platform follows a standard **ELT (Extract, Load, Transform)** pattern:
+## Setup
 
-1. Raw financial data is ingested from source systems
-2. Data is stored in a raw and staging layer
-3. Finance-aware validation rules are applied
-4. Clean, structured warehouse tables are built
-5. Analytics queries operate only on validated data
+### 1) Create a virtual environment (recommended)
 
----
-
-## Technology Stack
-- **Python** – ingestion, validation, orchestration
-- **SQL** – warehouse transformations and analytics
-- **DuckDB** – local analytical warehouse (Parquet-native)
-- **Parquet** – columnar storage format
-- **Git & GitHub** – version control
-
-*(Cloud tooling such as AWS, dbt, and Airflow are planned extensions.)*
-
----
-
-## Project Structure
-```text
-architecture/        # Architecture notes and data quality rules
-data/
-  ├── raw/            # Raw source data
-  └── staging/        # Validated, quarantined, and warehouse-ready data
-ingestion/           # Extraction and validation logic
-transformations/     # Warehouse build SQL and scripts
-orchestration/       # Pipeline orchestration logic
-warehouse/           # Warehouse schema documentation
-analytics_examples/  # Example analytics queries
-infra/               # Infrastructure notes (future)
+**Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m venv .venv
+source .venv/bin/activate
