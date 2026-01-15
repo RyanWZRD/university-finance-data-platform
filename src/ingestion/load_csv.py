@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any, Dict, Tuple, Union
 
 import pandas as pd
 
@@ -15,19 +16,13 @@ from src.validation.validate_schema import (
 def load_transactions_csv(
     raw_path: Path | None = None,
     processed_dir: Path | None = None,
-) -> pd.DataFrame:
+    quarantine_enabled: bool = True,
+    return_metrics: bool = False,
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Dict[str, Any]]]:
     """
-    Load transactions CSV, quarantine bad rows, validate clean rows,
+    Load transactions CSV, optionally quarantine bad rows, validate clean rows,
     and write processed outputs.
-
-    Args:
-        raw_path: Optional path to the raw CSV.
-        processed_dir: Optional directory for processed outputs.
-
-    Returns:
-        Clean (validated) DataFrame.
     """
-    # --- Resolve paths ---
     file_path = raw_path or Path("data/raw/transactions_sample.csv")
     processed_dir = processed_dir or Path("data/processed")
 
@@ -36,41 +31,56 @@ def load_transactions_csv(
 
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Load ---
     df = pd.read_csv(file_path)
 
-    # --- Quarantine rules ---
-    required_cols = [
-        "transaction_id",
-        "transaction_date",
-        "department_id",
-        "transaction_type",
-        "amount",
-    ]
+    metrics: Dict[str, Any] = {
+        "input_rows": int(len(df)),
+        "clean_rows": None,
+        "quarantined_rows": 0,
+        "quarantine_missing_required": 0,
+        "quarantine_invalid_date": 0,
+        "quarantine_enabled": bool(quarantine_enabled),
+    }
 
-    missing_required_mask = df[required_cols].isna().any(axis=1)
-    parsed_dates = pd.to_datetime(df["transaction_date"], errors="coerce")
-    invalid_date_mask = parsed_dates.isna()
+    quarantine_df = pd.DataFrame(columns=df.columns)
 
-    quarantine_mask = missing_required_mask | invalid_date_mask
+    if quarantine_enabled:
+        required_cols = [
+            "transaction_id",
+            "transaction_date",
+            "department_id",
+            "transaction_type",
+            "amount",
+        ]
 
-    quarantine_df = df[quarantine_mask].copy()
-    clean_df = df[~quarantine_mask].copy()
+        missing_required_mask = df[required_cols].isna().any(axis=1)
+        parsed_dates = pd.to_datetime(df["transaction_date"], errors="coerce")
+        invalid_date_mask = parsed_dates.isna()
 
-    if not quarantine_df.empty:
-        logging.warning(f"Quarantining {len(quarantine_df)} bad rows")
-        logging.warning(
-            f"Quarantine reasons: "
-            f"missing_required={int(missing_required_mask.sum())}, "
-            f"invalid_date={int(invalid_date_mask.sum())}"
-        )
+        quarantine_mask = missing_required_mask | invalid_date_mask
 
-    df = clean_df
+        quarantine_df = df[quarantine_mask].copy()
+        df = df[~quarantine_mask].copy()
 
-    # --- Schema & business validation ---
-    spec = transactions_schema_spec()
+        metrics["quarantined_rows"] = int(len(quarantine_df))
+        metrics["quarantine_missing_required"] = int(missing_required_mask.sum())
+        metrics["quarantine_invalid_date"] = int(invalid_date_mask.sum())
 
+        if len(quarantine_df) > 0:
+            logging.warning(f"Quarantining {len(quarantine_df)} bad rows")
+            logging.warning(
+                "Quarantine reasons: "
+                f"missing_required={metrics['quarantine_missing_required']}, "
+                f"invalid_date={metrics['quarantine_invalid_date']}"
+            )
+
+        quarantine_path = processed_dir / "transactions_quarantine.csv"
+        quarantine_df.to_csv(quarantine_path, index=False)
+        logging.info(f"Wrote quarantined rows to: {quarantine_path}")
+
+    # Validate clean data
     try:
+        spec = transactions_schema_spec()
         validate_schema(df, spec)
         validate_transaction_types(df)
         validate_transaction_dates(df)
@@ -79,17 +89,24 @@ def load_transactions_csv(
         logging.error(f"Validation failed: {e}")
         raise
 
-    # --- Output ---
     clean_path = processed_dir / "transactions_clean.csv"
     df.to_csv(clean_path, index=False)
     logging.info(f"Wrote cleaned data to: {clean_path}")
 
-    if not quarantine_df.empty:
-        quarantine_path = processed_dir / "transactions_quarantine.csv"
-        quarantine_df.to_csv(quarantine_path, index=False)
-        logging.info(f"Wrote quarantined rows to: {quarantine_path}")
+    metrics["clean_rows"] = int(len(df))
+
+    # Trend-friendly metric
+    if metrics["input_rows"] > 0:
+        metrics["quarantine_rate"] = round(
+            metrics["quarantined_rows"] / metrics["input_rows"], 4
+        )
+    else:
+        metrics["quarantine_rate"] = 0.0
 
     logging.info(f"Clean rows: {len(df)} | Columns: {list(df.columns)}")
+
+    if return_metrics:
+        return df, metrics
 
     return df
 
@@ -99,4 +116,4 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(message)s",
     )
-    load_transactions_csv()
+    load_transactions_csv(return_metrics=False)
