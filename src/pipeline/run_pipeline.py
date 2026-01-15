@@ -1,47 +1,60 @@
 import argparse
 import logging
 from pathlib import Path
+import yaml
 
 from src.ingestion.load_csv import load_transactions_csv
 from src.transforms.transform_transactions import transform_transactions
 
 
-def setup_logging(log_level: str):
+def load_config(path: Path) -> dict:
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    with path.open("r") as f:
+        return yaml.safe_load(f)
+
+
+def setup_logging(level: str):
     logging.basicConfig(
-        level=getattr(logging, log_level),
+        level=getattr(logging, level),
         format="%(asctime)s | %(levelname)s | %(message)s",
     )
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Run the finance data pipeline.")
-    p.add_argument(
-        "--raw",
-        default="data/raw/transactions_sample.csv",
-        help="Path to raw transactions CSV",
+    parser = argparse.ArgumentParser(description="Run the finance data pipeline.")
+    parser.add_argument(
+        "--config",
+        default="config/dev.yml",
+        help="Path to YAML config file",
     )
-    p.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level",
-    )
-    return p.parse_args()
+    return parser.parse_args()
 
 
 def run():
     args = parse_args()
-    setup_logging(args.log_level)
+    config_path = Path(args.config)
 
-    raw_path = Path(args.raw)
+    config = load_config(config_path)
+    setup_logging(config["logging"]["level"])
 
     logging.info("Starting pipeline")
-    logging.info(f"Raw input: {raw_path}")
+    logging.info(f"Using config: {config_path}")
 
-    load_transactions_csv(raw_path=raw_path)
+    raw_path = Path(config["paths"]["raw"])
+    processed_dir = Path(config["paths"]["processed_dir"])
+    gold_dir = Path(config["paths"]["gold_dir"])
+
+    load_transactions_csv(
+        raw_path=raw_path,
+        processed_dir=processed_dir,
+    )
     logging.info("Ingestion complete")
 
-    transform_transactions()
+    transform_transactions(
+        processed_dir=processed_dir,
+        gold_dir=gold_dir,
+    )
     logging.info("Transform complete")
 
     logging.info("Pipeline finished successfully")

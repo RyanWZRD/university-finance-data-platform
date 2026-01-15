@@ -4,39 +4,53 @@ from pathlib import Path
 import pandas as pd
 
 
-def transform_transactions() -> pd.DataFrame:
-    processed_path = Path("data/processed/transactions_clean.csv")
+def transform_transactions(
+    processed_dir: Path | None = None,
+    gold_dir: Path | None = None,
+) -> pd.DataFrame:
+    """
+    Transform cleaned transactions into analytics and gold aggregates.
+
+    Args:
+        processed_dir: Directory containing cleaned input data.
+        gold_dir: Directory for gold outputs.
+
+    Returns:
+        Transformed analytics DataFrame.
+    """
+    processed_dir = processed_dir or Path("data/processed")
+    gold_dir = gold_dir or Path("data/gold")
+
+    processed_path = processed_dir / "transactions_clean.csv"
+
     if not processed_path.exists():
         raise FileNotFoundError(f"Missing cleaned input file: {processed_path}")
 
+    gold_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Load ---
     df = pd.read_csv(processed_path)
 
     # --- Transform 1: parse dates ---
     df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="raise")
 
-    # --- Transform 2: add date parts (analytics-friendly) ---
+    # --- Transform 2: add date parts ---
     df["year"] = df["transaction_date"].dt.year
     df["month"] = df["transaction_date"].dt.month
     df["year_month"] = df["transaction_date"].dt.to_period("M").astype(str)
 
-    # --- Transform 3: normalize sign conventions ---
-    # INCOME positive, EXPENSE negative, REFUND negative
+    # --- Transform 3: normalize amounts ---
     sign_map = {"INCOME": 1, "EXPENSE": -1, "REFUND": -1}
     df["amount_normalized"] = df["amount"].abs() * df["transaction_type"].map(sign_map)
-
-    # Avoid float weirdness for currency
     df["amount_normalized"] = df["amount_normalized"].round(2)
 
     # --- Output: analytics dataset ---
-    gold_dir = Path("data/gold")
-    gold_dir.mkdir(parents=True, exist_ok=True)
+    analytics_path = gold_dir / "transactions_analytics.csv"
+    df.to_csv(analytics_path, index=False)
+    logging.info(f"Wrote analytics dataset to: {analytics_path}")
 
-    out_path = gold_dir / "transactions_analytics.csv"
-    df.to_csv(out_path, index=False)
-    logging.info(f"Wrote analytics dataset to: {out_path}")
-
-    # --- Aggregate: department x month summary ---
-    summary_by_type = (
+    # --- Aggregate: department x month ---
+    summary = (
         df.pivot_table(
             index=["department_id", "year_month"],
             columns="transaction_type",
@@ -47,12 +61,11 @@ def transform_transactions() -> pd.DataFrame:
         .reset_index()
     )
 
-    # Ensure columns always exist
     for col in ["INCOME", "EXPENSE", "REFUND"]:
-        if col not in summary_by_type.columns:
-            summary_by_type[col] = 0.0
+        if col not in summary.columns:
+            summary[col] = 0.0
 
-    summary_by_type = summary_by_type.rename(
+    summary = summary.rename(
         columns={
             "INCOME": "total_income",
             "EXPENSE": "total_expense",
@@ -60,27 +73,31 @@ def transform_transactions() -> pd.DataFrame:
         }
     )
 
-    summary_by_type["net"] = (
-        summary_by_type["total_income"]
-        + summary_by_type["total_expense"]
-        + summary_by_type["total_refund"]
+    summary["net"] = (
+        summary["total_income"]
+        + summary["total_expense"]
+        + summary["total_refund"]
     )
 
     money_cols = ["total_income", "total_expense", "total_refund", "net"]
-    summary_by_type[money_cols] = summary_by_type[money_cols].round(2)
+    summary[money_cols] = summary[money_cols].round(2)
 
     summary_path = gold_dir / "department_monthly_summary.csv"
-    summary_by_type.to_csv(summary_path, index=False)
+    summary.to_csv(summary_path, index=False)
     logging.info(f"Wrote department summary to: {summary_path}")
-    logging.info("\n" + summary_by_type.sort_values(["department_id", "year_month"]).to_string(index=False))
 
-
-    # Helpful compact log (no huge tables unless you want them)
-    logging.info(f"Transform rows: {len(df)} | Departments: {df['department_id'].nunique()} | Months: {df['year_month'].nunique()}")
+    logging.info(
+        f"Transform rows: {len(df)} | "
+        f"Departments: {df['department_id'].nunique()} | "
+        f"Months: {df['year_month'].nunique()}"
+    )
 
     return df
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
     transform_transactions()

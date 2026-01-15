@@ -1,0 +1,10 @@
+paths:
+  raw: data/raw/transactions_sample.csv
+  processed_dir: data/processed
+  gold_dir: data/gold
+
+logging:
+  level: INFO
+
+pipeline:
+  quarantine_enabled: true
