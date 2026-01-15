@@ -6,3 +6,10 @@ __pycache__/
 *.pyc
 # Local DuckDB database
 warehouse.duckdb
+# Python
+__pycache__/
+*.pyc
+
+# Data outputs
+data/processed/
+data/gold/
