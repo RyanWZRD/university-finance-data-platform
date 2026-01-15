@@ -39,11 +39,11 @@ def main():
                 "timestamp": run_ts,
                 "input_rows": ingest.get("input_rows"),
                 "clean_rows": ingest.get("clean_rows"),
-                "quarantined_rows": ingest.get("quarantined_rows"),
                 "quarantine_rate": ingest.get("quarantine_rate", 0.0),
 "income_total": transform.get("income_total", 0.0),
 "expense_total": transform.get("expense_total", 0.0),
 "net_total": transform.get("net_total", 0.0),
+
 
             }
         )

@@ -64,7 +64,7 @@ def run():
 
     quarantine_enabled = bool(config.get("pipeline", {}).get("quarantine_enabled", True))
 
-    # --- Ingestion (returns df + metrics) ---
+    # --- Ingestion (df_clean + metrics) ---
     df_clean, ingest_metrics = load_transactions_csv(
         raw_path=raw_path,
         processed_dir=processed_dir,
@@ -73,43 +73,31 @@ def run():
     )
     logging.info("Ingestion complete")
 
-    # --- Transform (returns df) ---
+    # --- Transform (df_analytics) ---
     df_analytics = transform_transactions(
         processed_dir=processed_dir,
         gold_dir=gold_dir,
     )
     logging.info("Transform complete")
-        # --- Net totals (trend-friendly metrics) ---
+
+        # --- Trend-friendly totals (compute from clean transactions) ---
     df_calc = df_clean.copy()
 
-if "transaction_type" in df_calc.columns and "amount" in df_calc.columns:
-    income_total = float(df_calc.loc[df_calc["transaction_type"] == "income", "amount"].sum())
-    expense_total = float(df_calc.loc[df_calc["transaction_type"] == "expense", "amount"].sum())
-else:
-    income_total = 0.0
-    expense_total = 0.0
-
-net_total = income_total - expense_total
-
-
-
-    # --- Net totals (trend-friendly metrics) ---
-    df_calc = df_analytics.copy()
-
     if "transaction_type" in df_calc.columns and "amount" in df_calc.columns:
-        income_total = float(
-            df_calc.loc[df_calc["transaction_type"] == "income", "amount"].sum()
-        )
-        expense_total = float(
-            df_calc.loc[df_calc["transaction_type"] == "expense", "amount"].sum()
-        )
+        t = df_calc["transaction_type"].astype(str).str.strip().str.lower()
+
+        income_total = float(df_calc.loc[t.isin(["income", "refund"]), "amount"].sum())
+        expense_total = float(df_calc.loc[t == "expense", "amount"].sum())
     else:
         income_total = 0.0
         expense_total = 0.0
 
     net_total = income_total - expense_total
 
-    # --- Build run metrics payload ---
+
+    net_total = income_total - expense_total
+
+    # --- Run metrics payload ---
     run_metrics: Dict[str, Any] = {
         "run": {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -137,9 +125,5 @@ net_total = income_total - expense_total
     logging.info("Pipeline finished successfully")
 
 
-
 if __name__ == "__main__":
     run()
-    # Net totals (positive for income, negative for expense)
-
-
